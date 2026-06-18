@@ -1,14 +1,41 @@
-# Markdown → HTML → SCORM / Common Cartridge Pipeline
+# Markdown to LearningZone
+## A GitHub based Markdown → HTML → SCORM / Common Cartridge Pipeline
 
 ## Overview
 
 This repository demonstrates a complete workflow for converting structured Markdown content into:
 
-- ✅ Styled HTML pages  
-- ✅ IMS Common Cartridge packages (for VLE import)  
-- ✅ SCORM 1.2 packages (legacy LMS compatibility)  
+- Styled HTML pages  
+- IMS Common Cartridge packages (for VLE import)  
+- SCORM 1.2 packages (legacy LMS compatibility)  
 
-It is designed as a **training and demonstration repository** covering both Markdown usage and automated LMS packaging.
+It is designed as a **training and demonstration repository** covering both basic Markdown usage and automated packaging for Learning Zone.  
+This is a template repository.  
+Click Use this template and you will get your own copy of the repo to play with.
+
+## Disclaimer
+
+I have only tested this with the LearningZone VLE, which is a variant of BrightSpace.
+I have tried to keep to standards for both IMS and SCORM, however I cannot guarantee it will work for your VLE.
+I recommend you use the next Section to try it our and see if it works with you VLE before proceeding any further.
+
+---
+
+## Try It Out
+
+You can try all the functionality of the repo as is stands.
+The folder md has a collection of markdown files.
+These can automatically converted to HTML and then package as an IMS Common Cartridge or a SCORM package.
+Steps:
+
+1. Browse the folders and files in the **md** folder.  You will notice the are all proceeded with numbers.  These give order the will appear in your VLE.  For number 1 to 9 always put a proceeding 0.
+2. Run the **Build HTML from Markdown** action.
+3. Pull the repo and browse the files in the HTML file. These are the files that will be packaged.  The numbers in front of the file names are still needed.  I do not recommend edit these files at this point.  If you want changes make them in markdown and rerun the conversion.
+4. Package the html files, I recommend you run the **Build Course package** action. Pull again and you will find a file called course-package.zip.  This is the file you need to upload to you VLE.  For Learning Zone you do this with Module Tools &rarr; Course Admin &rarr; Import/Export/Copy Components.  Select Import Components &rarr; from a course package.  Upload course-package.zip and press Import All Components.  Wait a while and you will have a new item in you module shell called **Markdown Course Package** with all the imported content it.
+
+If you're happy with all these steps you can start replacing the markdown files with your own content.  Use folders to give structure and stick to the number convention to ensure your content is presented in your desired order.  The name of each page is taken from the first markdown heading in the file, so you do not need to be precious with file names, just stick to a reasonable convention.  Image file need to be placed in the same folder as the markdown file they are referenced in.  It is a current limitation that if you use an image in multiple markdown files in multiple folder a copy of that image will need to be placed in each folder.
+
+There is more information in the remainder of this read me but you now everything you need to manage and convert you markdown files for importing to Learning Zone.
 
 ---
 
@@ -59,15 +86,16 @@ Created during workflows:
 
 - `html/` (temporary build folder)
 - `scorm-package.zip`
-- `cc-package.zip`
+- `course-package.zip`
 
-⚠️ These files are generated and should not be edited manually.
 
 ---
 
 ## Workflows
 
-### 1. Build HTML From Markdown ✅ REQUIRED FIRST
+### 1. Build HTML From Markdown 
+
+> Note: You must run this workflow before building a course or SCORM package.
 
 This workflow converts Markdown into HTML using Pandoc.
 
@@ -189,12 +217,5 @@ This project is licensed under the MIT License.
 
 ---
 
-## Summary
 
-This repository provides a complete pipeline to:
-
-✅ Author content in Markdown  
-✅ Convert to HTML  
-✅ Package for LMS delivery  
-✅ Support both modern (CC) and legacy (SCORM)
 
