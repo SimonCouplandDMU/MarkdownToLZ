@@ -17,6 +17,35 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v5
 
+      - name: Generate index.html
+        run: |
+          set -e
+      
+          echo '<!DOCTYPE html>' > html/index.html
+          echo '<html><head><meta charset="utf-8"><title>Course</title></head><body>' >> html/index.html
+          echo '<h1>Course Content</h1>' >> html/index.html
+          echo '<ul>' >> html/index.html
+      
+          # list all HTML pages except index itself
+          find html -name "*.html" ! -name "index.html" | sort | while IFS= read -r file; do
+            rel="${file#html/}"
+      
+            title_file="${file%.html}.title"
+      
+            if [ -f "$title_file" ]; then
+              name=$(cat "$title_file")
+            else
+              name=$(basename "$file" .html)
+            fi
+      
+            name=$(echo "$name" | sed 's/^[0-9]\+[_ -]*//')
+      
+            echo "<li><a href=\"$rel\">$name</a></li>" >> html/index.html
+          done
+      
+          echo '</ul>' >> html/index.html
+          echo '</body></html>' >> html/index.html
+
       - name: Copy index.html into html folder
         run: |
           cp index.html html/
@@ -141,3 +170,7 @@ jobs:
             git commit -m "Update SCORM package"
             git push
           fi
+
+      - name: Clean up generated index.html
+        run: |
+          rm -f html/index.html
