@@ -1,0 +1,165 @@
+name: Build Course package
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  buildCoursePackage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      # Generate manifest
+      - name: Generate Common Cartridge manifest
+        run: |
+          set -e
+
+          # Recursive function to generate nested items
+          generate_items() {
+            local current_dir="$1"
+            local relative_dir="${current_dir#html/}"
+            local name=$(basename "$current_dir")
+          
+            # Clean display name
+            clean_name=$(echo "$name" | sed 's/^[0-9]\+[_-]*//' | sed 's/_/ /g')
+            clean_name=$(echo "$clean_name" | sed 's/\b\(.\)/\u\1/g')
+          
+            safe_id=$(echo "$relative_dir" | tr '/ .-' '____')
+          
+            # Open folder item
+            echo "        <item identifier=\"FOLDER_$safe_id\">" >> html/imsmanifest.xml
+            echo "          <title>$clean_name</title>" >> html/imsmanifest.xml
+
+            # Decide if this folder has pages (content) or is structure-only
+            has_pages=$(find "$current_dir" -maxdepth 1 -name "*.html" | wc -l)
+            
+            # Only include pages if this folder actually has them
+            if [ "$has_pages" -gt 0 ]; then
+              find "$current_dir" -maxdepth 1 -name "*.html" | sort | while IFS= read -r file; do
+                rel="${file#html/}"
+                safe_file_id=$(echo "$rel" | tr '/ .-' '____')
+            
+                title_file="${file%.html}.title"
+            
+                if [ -f "$title_file" ]; then
+                  page_name=$(cat "$title_file")
+                else
+                  page_name=$(basename "$file" .html | sed 's/_/ /g')
+                fi
+            
+                page_name=$(echo "$page_name" | sed 's/^[0-9]\+[_ -]*//')
+            
+                echo "          <item identifier=\"ITEM_$safe_file_id\" identifierref=\"RES_$safe_file_id\">" >> html/imsmanifest.xml
+                echo "            <title>$page_name</title>" >> html/imsmanifest.xml
+                echo "          </item>" >> html/imsmanifest.xml
+              done
+            fi
+
+          
+            # Recurse into subdirectories
+            find "$current_dir" -mindepth 1 -maxdepth 1 -type d | sort | while IFS= read -r subdir; do
+              generate_items "$subdir"
+            done
+          
+            # Close folder item
+            echo "        </item>" >> html/imsmanifest.xml
+          }
+
+          rm -f html/imsmanifest.xml
+      
+          # Header
+          echo '<?xml version="1.0" encoding="UTF-8"?>' >> html/imsmanifest.xml
+          echo '<manifest identifier="CCPackage"' >> html/imsmanifest.xml
+          echo '  xmlns="http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1"' >> html/imsmanifest.xml
+          echo '  version="1.1">' >> html/imsmanifest.xml
+      
+          echo '  <metadata>' >> html/imsmanifest.xml
+          echo '    <schema>IMS Common Cartridge</schema>' >> html/imsmanifest.xml
+          echo '    <schemaversion>1.1.0</schemaversion>' >> html/imsmanifest.xml
+          echo '  </metadata>' >> html/imsmanifest.xml
+      
+          echo '  <organizations default="ORG1">' >> html/imsmanifest.xml
+          echo '    <organization identifier="ORG1">' >> html/imsmanifest.xml
+          echo '      <title>Imported Content</title>' >> html/imsmanifest.xml
+      
+          # Root item
+          echo '      <item identifier="ROOT">' >> html/imsmanifest.xml
+          echo '        <title>Markdown Course Package</title>' >> html/imsmanifest.xml
+      
+      
+          # Loop folders, generating nested folder structure
+          for dir in html/*; do
+            if [ -d "$dir" ]; then
+              generate_items "$dir"
+            fi
+          done
+      
+      
+          # Close structure
+          echo '      </item>' >> html/imsmanifest.xml
+          echo '    </organization>' >> html/imsmanifest.xml
+          echo '  </organizations>' >> html/imsmanifest.xml
+      
+      
+          # Resources section (ALL html files witth supporting css)
+          echo '  <resources>' >> html/imsmanifest.xml
+      
+          find html -name "*.html" | sort | while IFS= read -r file; do
+            rel="${file#html/}"
+            dir=$(dirname "$file")
+            safe_id=$(echo "$rel" | tr '/ .-' '____')
+          
+            echo "    <resource identifier=\"RES_$safe_id\" type=\"webcontent\" href=\"$rel\">" >> html/imsmanifest.xml
+          
+            # main HTML file
+            echo "      <file href=\"$rel\"/>" >> html/imsmanifest.xml
+          
+            
+            # Include ALL assets in same folder (CSS, images, etc., but NOT .title)
+            find "$dir" -type f ! -name "*.html" ! -name "*.title" | while IFS= read -r asset; do
+              asset_rel="${asset#html/}"
+              echo "      <file href=\"$asset_rel\"/>" >> html/imsmanifest.xml
+            done
+          
+            echo "    </resource>" >> html/imsmanifest.xml
+          done
+
+      
+          echo '  </resources>' >> html/imsmanifest.xml
+          echo '</manifest>' >> html/imsmanifest.xml
+
+
+      # Create marker file to BrightSpace recognises it
+      - name: Create imscc marker file
+        run: |
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > html/imscc.xml
+          echo '<cartridge_basiclti_link xmlns="http://www.imsglobal.org/xsd/imslticc_v1p0"/>' >> html/imscc.xml
+
+      # Create package zip (IMPORTANT: root contents only)
+      - name: Create  package
+        run: |
+          cd html
+          zip -r ../course-package.zip .
+
+      # Commit package
+      - name: Commit package
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add course-package.zip
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update course package"
+            git push
+          fi
