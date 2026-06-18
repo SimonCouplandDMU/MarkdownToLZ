@@ -17,34 +17,35 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v5
 
-      # Generate index.html
       - name: Generate index.html
         run: |
           set -e
-
+      
           mkdir -p html
-
+      
+          # copy CSS into root
+          cp resources/github-markdown.css html/
+          cp resources/custom.css html/
+      
           echo '<!DOCTYPE html>' > html/index.html
-          echo '<html><head><meta charset="utf-8"><title>Course</title></head><body>' >> html/index.html
+      
+          echo '<html><head>
+                <meta charset="utf-8">
+                <title>Course</title>
+                <link rel="stylesheet" href="github-markdown.css">
+                <link rel="stylesheet" href="custom.css">
+                </head><body class="markdown-body">' >> html/index.html
+      
           echo '<h1>Course Content</h1><ul>' >> html/index.html
-
+      
           find html -name "*.html" ! -name "index.html" | sort | while IFS= read -r file; do
             rel="${file#html/}"
-            title_file="${file%.html}.title"
-
-            if [ -f "$title_file" ]; then
-              name=$(cat "$title_file")
-            else
-              name=$(basename "$file" .html)
-            fi
-
-            name=$(echo "$name" | sed 's/^[0-9]\+[_ -]*//')
-
+            name=$(basename "$file" .html)
+      
             echo "<li><a href=\"$rel\">$name</a></li>" >> html/index.html
           done
-
+  
           echo '</ul></body></html>' >> html/index.html
-
 
       # Generate SCORM manifest
       - name: Generate SCORM manifest
