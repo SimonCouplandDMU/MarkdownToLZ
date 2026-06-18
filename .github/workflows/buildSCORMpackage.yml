@@ -21,14 +21,14 @@ jobs:
         run: |
           cp index.html html/
 
-      # ✅ Generate SCORM manifest with structure + assets
+      # Generate SCORM manifest with structure + assets
       - name: Generate SCORM manifest
         run: |
           set -e
 
           rm -f html/imsmanifest.xml
 
-          # ✅ Recursive function for nested structure
+          # Recursive function for nested structure
           generate_items() {
             local current_dir="$1"
             local relative_dir="${current_dir#html/}"
@@ -42,7 +42,7 @@ jobs:
             echo "      <item identifier=\"FOLDER_$safe_id\">" >> html/imsmanifest.xml
             echo "        <title>$clean_name</title>" >> html/imsmanifest.xml
 
-            # ✅ detect if folder has pages
+            # detect if folder has pages
             has_pages=$(find "$current_dir" -maxdepth 1 -name "*.html" ! -name "index.html" | wc -l)
 
             if [ "$has_pages" -gt 0 ]; then
@@ -66,7 +66,7 @@ jobs:
               done
             fi
 
-            # ✅ recurse into subfolders
+            # recurse into subfolders
             find "$current_dir" -mindepth 1 -maxdepth 1 -type d | sort | while IFS= read -r subdir; do
               generate_items "$subdir"
             done
@@ -74,7 +74,7 @@ jobs:
             echo "      </item>" >> html/imsmanifest.xml
           }
 
-          # ✅ Header
+          # Header
           echo '<?xml version="1.0" encoding="UTF-8"?>' >> html/imsmanifest.xml
           echo '<manifest identifier="com.example.scorm" version="1.2">' >> html/imsmanifest.xml
 
@@ -82,11 +82,11 @@ jobs:
           echo '    <organization identifier="ORG1">' >> html/imsmanifest.xml
           echo '      <title>Learning Materials</title>' >> html/imsmanifest.xml
 
-          # ✅ ROOT
+          # ROOT
           echo '      <item identifier="ROOT">' >> html/imsmanifest.xml
           echo '        <title>Course</title>' >> html/imsmanifest.xml
 
-          # ✅ Generate structure
+          # Generate structure
           for dir in html/*; do
             if [ -d "$dir" ]; then
               generate_items "$dir"
@@ -97,7 +97,7 @@ jobs:
           echo '    </organization>' >> html/imsmanifest.xml
           echo '  </organizations>' >> html/imsmanifest.xml
 
-          # ✅ Resources (with assets)
+          # Resources (with assets)
           echo '  <resources>' >> html/imsmanifest.xml
 
           find html -name "*.html" | sort | while IFS= read -r file; do
@@ -110,7 +110,7 @@ jobs:
             # main html
             echo "      <file href=\"$rel\"/>" >> html/imsmanifest.xml
 
-            # ✅ include all assets except .title
+            # include all assets except .title
             find "$dir" -type f ! -name "*.html" ! -name "*.title" | while IFS= read -r asset; do
               asset_rel="${asset#html/}"
               echo "      <file href=\"$asset_rel\"/>" >> html/imsmanifest.xml
@@ -122,7 +122,7 @@ jobs:
           echo '  </resources>' >> html/imsmanifest.xml
           echo '</manifest>' >> html/imsmanifest.xml
 
-      # ✅ Zip package
+      # Zip package
       - name: Create SCORM package
         run: |
           cd html
