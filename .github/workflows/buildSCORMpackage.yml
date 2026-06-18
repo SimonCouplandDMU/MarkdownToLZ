@@ -2,7 +2,7 @@ name: Build SCORM package
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  
+
 on:
   workflow_dispatch:
 
@@ -17,19 +17,19 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v5
 
-      # Generate index.html (launch page)
+      # Generate index.html
       - name: Generate index.html
         run: |
           set -e
 
+          mkdir -p html
+
           echo '<!DOCTYPE html>' > html/index.html
           echo '<html><head><meta charset="utf-8"><title>Course</title></head><body>' >> html/index.html
-          echo '<h1>Course Content</h1>' >> html/index.html
-          echo '<ul>' >> html/index.html
+          echo '<h1>Course Content</h1><ul>' >> html/index.html
 
           find html -name "*.html" ! -name "index.html" | sort | while IFS= read -r file; do
             rel="${file#html/}"
-
             title_file="${file%.html}.title"
 
             if [ -f "$title_file" ]; then
@@ -43,8 +43,7 @@ jobs:
             echo "<li><a href=\"$rel\">$name</a></li>" >> html/index.html
           done
 
-          echo '</ul>' >> html/index.html
-          echo '</body></html>' >> html/index.html
+          echo '</ul></body></html>' >> html/index.html
 
 
       # Generate SCORM manifest
@@ -54,7 +53,7 @@ jobs:
 
           rm -f html/imsmanifest.xml
 
-          # Recursive function for hierarchy
+          # Recursive folder → item generator
           generate_items() {
             local current_dir="$1"
             local relative_dir="${current_dir#html/}"
@@ -68,7 +67,7 @@ jobs:
             echo "      <item identifier=\"FOLDER_$safe_id\">" >> html/imsmanifest.xml
             echo "        <title>$clean_name</title>" >> html/imsmanifest.xml
 
-            # detect pages in this folder
+            # Pages in this folder
             has_pages=$(find "$current_dir" -maxdepth 1 -name "*.html" ! -name "index.html" | wc -l)
 
             if [ "$has_pages" -gt 0 ]; then
@@ -92,15 +91,15 @@ jobs:
               done
             fi
 
-            # recurse subfolders
+            # Recurse into subfolders
             find "$current_dir" -mindepth 1 -maxdepth 1 -type d | sort | while IFS= read -r subdir; do
               generate_items "$subdir"
             done
 
-            echo '    </organization>' >> html/imsmanifest.xml
+            echo "      </item>" >> html/imsmanifest.xml
           }
 
-          # Manifest header
+          # Header
           echo '<?xml version="1.0" encoding="UTF-8"?>' >> html/imsmanifest.xml
           echo '<manifest identifier="com.example.scorm" version="1.2">' >> html/imsmanifest.xml
 
@@ -108,11 +107,11 @@ jobs:
           echo '    <organization identifier="ORG1">' >> html/imsmanifest.xml
           echo '      <title>Learning Materials</title>' >> html/imsmanifest.xml
 
-          # Root container
+          # Root
           echo '      <item identifier="ROOT">' >> html/imsmanifest.xml
           echo '        <title>Course</title>' >> html/imsmanifest.xml
 
-          # Launch item (IMPORTANT FIX)
+          # Launch item (critical for SCORM)
           echo '        <item identifier="INDEX" identifierref="RES_index_html">' >> html/imsmanifest.xml
           echo '          <title>Start Here</title>' >> html/imsmanifest.xml
           echo '        </item>' >> html/imsmanifest.xml
@@ -125,7 +124,7 @@ jobs:
           done
 
           echo '      </item>' >> html/imsmanifest.xml
-          echo '    </organizationfest.xml
+          echo '    </organization>' >> html/imsmanifest.xml
           echo '  </organizations>' >> html/imsmanifest.xml
 
           # Resources (HTML + assets)
@@ -137,22 +136,14 @@ jobs:
             safe_id=$(echo "$rel" | tr '/ .-' '____')
 
             echo "    <resource identifier=\"RES_$safe_id\" type=\"webcontent\" href=\"$rel\">" >> html/imsmanifest.xml
-            
-            # main file
+
+            # Main file
             echo "      <file href=\"$rel\"/>" >> html/imsmanifest.xml
-            
-            # include CSS, images, etc.
+
+            # Include CSS, images, etc.
             find "$dir" -type f ! -name "*.html" ! -name "*.title" | while IFS= read -r asset; do
               asset_rel="${asset#html/}"
               echo "      <file href=\"$asset_rel\"/>" >> html/imsmanifest.xml
-            done
-            
-            echo "    </resource>" >> html/imsmanifest.xml
-
-            # include CSS, images, etc.
-            find "$dir" -type f ! -name "*.html" ! -name "*.title" | while IFS= read -r asset; do
-              asset_rel="${asset#html/}"
-              echo "      \"$asset_rel\"/" >> html/imsmanifest.xml
             done
 
             echo "    </resource>" >> html/imsmanifest.xml
@@ -162,19 +153,18 @@ jobs:
           echo '</manifest>' >> html/imsmanifest.xml
 
 
-      # Create SCORM zip
+      # Build SCORM zip
       - name: Create SCORM package
         run: |
           cd html
           zip -r ../scorm-package.zip .
 
       # Clean up generated index
-      - name: Clean up generated index
+      - name: Clean up index
         run: |
           rm -f html/index.html
 
-
-      # Commit package
+      # Commit result
       - name: Commit SCORM package
         run: |
           git config user.name "github-actions[bot]"
