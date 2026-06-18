@@ -1,0 +1,86 @@
+name: Build HTML from Markdown
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Prepare output & copy assets
+        run: |
+          mkdir -p html
+          rsync -av --exclude='*.md' md/ html/
+          
+      - name: Convert Markdown to HTML
+        run: |
+          set -e
+          find md -name "*.md" | while IFS= read -r file; do
+            rel_path="${file#md/}"
+            out="html/${rel_path%.md}.html"
+            title_file="html/${rel_path%.md}.title"
+      
+            mkdir -p "$(dirname "$out")"
+      
+            # Extract title from first Markdown heading
+            md_title=$(grep -m1 '^[[:space:]]*#' "$file" | sed 's/^[[:space:]]*#\+[[:space:]]*//')
+
+            # Optional: capitilise the titles:
+            md_title=$(echo "$md_title" | sed 's/\b\(.\)/\u\1/g')
+            
+            # Fallback to filename if no heading
+            if [ -z "$md_title" ]; then
+              md_title=$(basename "$file" .md | sed 's/_/ /g')
+            fi
+      
+            # Trim trailing spaces (nice polish)
+            md_title=$(echo "$md_title" | sed 's/[[:space:]]*$//')
+      
+            # Use a clean version for Pandoc metadata (optional)
+            html_title="$md_title"
+      
+            # Convert to HTML
+            pandoc "$file" -s \
+                    --template=resources/template.html \
+                    --highlight-style=pygments \
+                    --metadata title="$html_title" \
+                    --mathjax \
+                    -o "$out"
+      
+            # Save .title file
+            echo "$md_title" > "$title_file"
+          done
+
+      - name: Copy resources into all output folders
+        run: |
+          find html -type d | while read dir; do
+            cp resources/github-markdown.css "$dir"
+            cp resources/custom.css "$dir"
+          done
+
+      - name: Commit HTML output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add html/
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update HTML output"
+            git push
+          fi
