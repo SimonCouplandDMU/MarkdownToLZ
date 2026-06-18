@@ -97,7 +97,7 @@ jobs:
               generate_items "$subdir"
             done
 
-            echo "      </item>" >> html/imsmanifest.xml
+            echo '    </organization>' >> html/imsmanifest.xml
           }
 
           # Manifest header
@@ -136,10 +136,18 @@ jobs:
             dir=$(dirname "$file")
             safe_id=$(echo "$rel" | tr '/ .-' '____')
 
-            echo "    \"$rel\"" >> html/imsmanifest.xml
-
+            echo "    <resource identifier=\"RES_$safe_id\" type=\"webcontent\" href=\"$rel\">" >> html/imsmanifest.xml
+            
             # main file
-            echo "      \"$rel\"/" >> html/imsmanifest.xml
+            echo "      <file href=\"$rel\"/>" >> html/imsmanifest.xml
+            
+            # include CSS, images, etc.
+            find "$dir" -type f ! -name "*.html" ! -name "*.title" | while IFS= read -r asset; do
+              asset_rel="${asset#html/}"
+              echo "      <file href=\"$asset_rel\"/>" >> html/imsmanifest.xml
+            done
+            
+            echo "    </resource>" >> html/imsmanifest.xml
 
             # include CSS, images, etc.
             find "$dir" -type f ! -name "*.html" ! -name "*.title" | while IFS= read -r asset; do
